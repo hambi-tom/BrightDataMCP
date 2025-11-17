@@ -5,6 +5,7 @@ import uvicorn
 
 BRIGHTDATA_API_KEY = os.getenv("BRIGHTDATA_API_KEY")
 
+# Create MCP server
 server = FastMCP(
     name="BrightData Universal MCP Proxy",
 )
@@ -24,9 +25,10 @@ def ping():
     """Ping test"""
     return "pong"
 
+# Start server
 if __name__ == "__main__":
     uvicorn.run(
-        server.app,
+        server.app,  # ← THIS IS CORRECT
         host="0.0.0.0",
         port=8000,
     )
