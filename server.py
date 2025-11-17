@@ -26,10 +26,8 @@ def ping():
 # -------------------------------------------------------
 if __name__ == "__main__":
     uvicorn.run(
-        server.app,
+        server.fastapi,        # ← FIXED LINE
         host="0.0.0.0",
         port=8000,
-
-        # REQUIRED FOR CHATGPT TO ACCEPT YOUR SERVER
         headers=[("Access-Control-Allow-Origin", "*")],
     )
