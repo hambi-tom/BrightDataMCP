@@ -9,11 +9,7 @@ import uvicorn
 BRIGHTDATA_API_KEY = os.getenv("BRIGHTDATA_API_KEY")
 
 server = FastMCP(
-    name="BrightData Universal MCP Proxy",
-    transport="sse",
-
-    # This MUST match your Render public URL
-    server_url="https://brightdatamcp.onrender.com/sse",
+    name="BrightData Universal MCP Proxy"
 )
 
 # -------------------------------------------------------
