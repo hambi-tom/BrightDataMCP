@@ -1,16 +1,17 @@
 import os
 from fastmcp import FastMCP
-from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+from fastapi.middleware.cors import CORSMiddleware
 
+# Load API key (you will need this later)
 BRIGHTDATA_API_KEY = os.getenv("BRIGHTDATA_API_KEY")
 
-# Create MCP server
+# Create server using FastMCP v2.x (NO transport, NO server_url)
 server = FastMCP(
-    name="BrightData Universal MCP Proxy",
+    name="BrightData Universal MCP Proxy"
 )
 
-# Add CORS middleware so ChatGPT accepts the connector
+# Add CORS (mandatory for ChatGPT MCP Connectors)
 server.app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,16 +20,17 @@ server.app.add_middleware(
     allow_headers=["*"],
 )
 
-# Simple test tool
+# Test tool
 @server.tool()
 def ping():
-    """Ping test"""
+    """Health check tool."""
     return "pong"
 
-# Start server
+
+# Start the server normally — FastMCP handles the MCP layer internally
 if __name__ == "__main__":
     uvicorn.run(
-        server.app,  # ← THIS IS CORRECT
+        server.app,
         host="0.0.0.0",
-        port=8000,
+        port=8000
     )
