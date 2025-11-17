@@ -1,19 +1,20 @@
 from fastmcp import FastMCP
-import uvicorn
 
-# Create MCP server
-server = FastMCP(name="BrightData MCP")
+# Create the MCP server
+server = FastMCP(
+    name="BrightData Universal MCP Proxy"
+)
 
-# Simple tool
+# Simple test tool so we know the server works
 @server.tool()
-def ping():
-    """Test tool"""
+def ping() -> str:
+    """Simple ping test that confirms the MCP server is reachable."""
     return "pong"
 
-# Start server
+# Start the MCP server with SSE transport on port 8000
 if __name__ == "__main__":
-    uvicorn.run(
-        server.app,
+    server.run(
+        transport="sse",
         host="0.0.0.0",
         port=8000
     )
