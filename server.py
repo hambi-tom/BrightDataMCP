@@ -1,41 +1,50 @@
 import os
 import requests
+from fastapi import FastAPI
 from fastmcp import FastMCP
+from fastmcp.integrations.fastapi import mount_fastmcp
+import uvicorn
 
-# Load secret Bright Data MCP URL (with token inside it)
 BRIGHTDATA_MCP_URL = os.getenv("BRIGHTDATA_MCP_URL")
-
 if not BRIGHTDATA_MCP_URL:
     raise RuntimeError("BRIGHTDATA_MCP_URL environment variable is missing!")
 
+# Your MCP server
+mcp = FastMCP(name="BrightData Universal MCP Proxy")
 
-# Create MCP server
-server = FastMCP(
-    name="BrightData Universal MCP Proxy"
-)
+# -----------------------
+# Required MCP routes
+# -----------------------
+
+app = FastAPI()
+
+@app.get("/")
+def root():
+    return {"status": "ok", "server": "BrightData MCP Proxy"}
+
+@app.get("/healthz")
+def health():
+    return {"ok": True}
+
+# Mount FastMCP on /sse and /messages
+mount_fastmcp(app, mcp)
 
 
-# ---- Simple ping ----
-@server.tool()
+# -----------------------
+# Tools
+# -----------------------
+
+@mcp.tool()
 def ping() -> str:
     return "pong"
 
-
-# ---- Helper: wrap responses in valid MCP format ----
-def wrap(result_text: str):
+def wrap(result: str):
     return {
         "type": "result",
-        "content": [
-            {
-                "type": "text",
-                "text": result_text
-            }
-        ]
+        "content": [{"type": "text", "text": result}]
     }
 
-
-# ---- Bright Data: search_engine ----
-@server.tool()
+@mcp.tool()
 def search_engine(query: str):
     payload = {
         "type": "message",
@@ -48,9 +57,7 @@ def search_engine(query: str):
     r = requests.post(BRIGHTDATA_MCP_URL, json=payload)
     return wrap(r.text)
 
-
-# ---- Bright Data: scrape_as_markdown ----
-@server.tool()
+@mcp.tool()
 def scrape_as_markdown(url: str):
     payload = {
         "type": "message",
@@ -63,9 +70,7 @@ def scrape_as_markdown(url: str):
     r = requests.post(BRIGHTDATA_MCP_URL, json=payload)
     return wrap(r.text)
 
-
-# ---- Bright Data: search_engine_batch ----
-@server.tool()
+@mcp.tool()
 def search_engine_batch(queries: list[str]):
     payload = {
         "type": "message",
@@ -78,9 +83,7 @@ def search_engine_batch(queries: list[str]):
     r = requests.post(BRIGHTDATA_MCP_URL, json=payload)
     return wrap(r.text)
 
-
-# ---- Bright Data: scrape_batch ----
-@server.tool()
+@mcp.tool()
 def scrape_batch(urls: list[str]):
     payload = {
         "type": "message",
@@ -94,10 +97,9 @@ def scrape_batch(urls: list[str]):
     return wrap(r.text)
 
 
-# ---- Run server (same as yesterday) ----
+# -----------------------
+# Start server
+# -----------------------
+
 if __name__ == "__main__":
-    server.run(
-        transport="sse",
-        host="0.0.0.0",
-        port=8000
-    )
+    uvicorn.run(app, host="0.0.0.0", port=8000)
