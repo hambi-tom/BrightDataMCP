@@ -1,6 +1,1 @@
 fastmcp
-fastapi
-uvicorn
-requests
-python-dotenv
-langchain-brightdata
