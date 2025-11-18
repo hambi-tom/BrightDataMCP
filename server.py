@@ -3,31 +3,19 @@ import requests
 from fastmcp import FastMCP
 from fastapi import FastAPI
 
-# Load secret Bright Data MCP URL
 BRIGHTDATA_MCP_URL = os.getenv("BRIGHTDATA_MCP_URL")
 if not BRIGHTDATA_MCP_URL:
     raise RuntimeError("BRIGHTDATA_MCP_URL environment variable is missing!")
 
-# Create FastMCP server
-server = FastMCP(
-    name="BrightData Universal MCP Proxy"
-)
-
-# Attach FastAPI app (needed for custom routes like /healthz)
+server = FastMCP(name="BrightData Universal MCP Proxy")
 app: FastAPI = server.app
 
 
-# ------------------------
-# HEALTH CHECK ENDPOINT
-# ------------------------
 @app.get("/healthz")
 async def health_check():
     return {"ok": True}
 
 
-# ------------------------
-# HELPER – FORWARD REQUESTS TO BRIGHT DATA MCP
-# ------------------------
 def forward_to_brightdata(tool_name: str, arguments: dict):
     payload = {
         "type": "message",
@@ -39,20 +27,17 @@ def forward_to_brightdata(tool_name: str, arguments: dict):
     }
 
     try:
-        response = requests.post(
+        r = requests.post(
             BRIGHTDATA_MCP_URL,
             json=payload,
-            timeout=30  # important: avoid Render restart
+            timeout=30
         )
-        response.raise_for_status()
-        return response.text
+        r.raise_for_status()
+        return r.text
     except Exception as e:
         return f"Bright Data MCP error: {e}"
 
 
-# ------------------------
-# TOOLS
-# ------------------------
 @server.tool()
 def ping() -> str:
     return "pong"
@@ -78,13 +63,10 @@ def scrape_batch(urls: list[str]) -> str:
     return forward_to_brightdata("scrape_batch", {"urls": urls})
 
 
-# ------------------------
-# RUN SERVER
-# ------------------------
 if __name__ == "__main__":
     server.run(
         transport="sse",
         host="0.0.0.0",
         port=8000,
-        path="/mcp"   # IMPORTANT: your new SSE endpoint
+        base_path="/mcp"  # <--- THIS is the correct parameter
     )
