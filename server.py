@@ -3,7 +3,6 @@ import requests
 from fastmcp import FastMCP
 
 # Load secret Bright Data MCP URL
-# IMPORTANT: Ensure this environment variable is set on Render!
 BRIGHTDATA_MCP_URL = os.getenv("BRIGHTDATA_MCP_URL")
 if not BRIGHTDATA_MCP_URL:
     raise RuntimeError("BRIGHTDATA_MCP_URL environment variable is missing!")
@@ -76,8 +75,7 @@ def scrape_batch(urls: list[str]) -> str:
 
 if __name__ == "__main__":
     server.run(
-        # Removed 'transport="sse"'. FastMCP will now default to the
-        # correct HTTP/WebSocket transport needed for the ChatGPT connector.
+        transport="ws", # <-- The fix! Uses the WebSocket/HTTP transport.
         host="0.0.0.0",
         port=8000
     )
