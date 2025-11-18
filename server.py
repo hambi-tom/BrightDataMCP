@@ -1,73 +1,44 @@
 import os
 from fastmcp import FastMCP
-import uvicorn
-from fastapi.middleware.cors import CORSMiddleware
+from fastmcp.clients import MCPClient
 
-# -------------------------------------------------------
-# LOAD ENV VARIABLES
-# -------------------------------------------------------
-BRIGHT_DATA_API_KEY = os.getenv("BRIGHT_DATA_API_KEY")
-if not BRIGHT_DATA_API_KEY:
-    raise RuntimeError(
-        "BRIGHT_DATA_API_KEY environment variable is not set. "
-        "Add it in Render → Environment → Add Env Var."
-    )
-
-BRIGHTDATA_API_BASE = "https://api.brightdata.com"
-
-
-# -------------------------------------------------------
-# INIT SERVER (SSE TRANSPORT FOR RENDER)
-# -------------------------------------------------------
+# Create your MCP server
 server = FastMCP(
-    name="BrightData Universal MCP Proxy",
-    transport="sse",
+    name="BrightData Universal MCP Proxy"
 )
 
-
-# -------------------------------------------------------
-# CORS FIX (REQUIRED FOR CHATGPT)
-# -------------------------------------------------------
-server.fastapi.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-# -------------------------------------------------------
-# BASIC PING TOOL
-# -------------------------------------------------------
+# Simple ping tool (same as before)
 @server.tool()
-def ping():
-    """Simple ping to verify MCP server works."""
+def ping() -> str:
+    """Simple ping test."""
     return "pong"
 
 
-# -------------------------------------------------------
-# EXAMPLE — Bright Data Tool: List Proxies
-# -------------------------------------------------------
-import requests
+# ─────────────────────────────────────────────
+# Connect to Bright Data MCP server
+# ─────────────────────────────────────────────
 
-@server.tool()
-def list_proxies():
-    """List all Bright Data proxies."""
-    url = f"{BRIGHTDATA_API_BASE}/proxies"
-    headers = {"Authorization": f"Bearer {BRIGHT_DATA_API_KEY}"}
+BRIGHTDATA_URL = os.getenv("BRIGHTDATA_MCP_URL")
 
-    resp = requests.get(url, headers=headers)
-    return resp.json()
+if not BRIGHTDATA_URL:
+    raise RuntimeError("BRIGHTDATA_MCP_URL environment variable is missing")
+
+# Client connected to the official Bright Data MCP server
+brightdata = MCPClient(
+    url=BRIGHTDATA_URL,
+    name="brightdata"
+)
+
+# Register Bright Data tools inside your server
+server.mount_client(brightdata)
 
 
-# -------------------------------------------------------
-# START SERVER (REQUIRED FOR RENDER)
-# -------------------------------------------------------
+# ─────────────────────────────────────────────
+# Start YOUR MCP server using SSE (same as yesterday)
+# ─────────────────────────────────────────────
 if __name__ == "__main__":
-    uvicorn.run(
-        server.fastapi,   # ← MUST BE fastapi
+    server.run(
+        transport="sse",
         host="0.0.0.0",
-        port=8000,
-        headers=[("Access-Control-Allow-Origin", "*")],
+        port=8000
     )
