@@ -1,1 +1,2 @@
 fastmcp
+langchain-brightdata==0.1.3
