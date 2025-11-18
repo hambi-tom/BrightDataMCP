@@ -75,7 +75,7 @@ def scrape_batch(urls: list[str]) -> str:
 
 if __name__ == "__main__":
     server.run(
-        transport="ws", # <-- The fix! Uses the WebSocket/HTTP transport.
+        transport="http", # <-- The fix! Uses the WebSocket/HTTP transport.
         host="0.0.0.0",
         port=8000
     )
