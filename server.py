@@ -1,84 +1,86 @@
 import os
-import httpx
+import requests
 from fastmcp import FastMCP
 
+# Load secret Bright Data MCP URL (with token inside it)
 BRIGHTDATA_MCP_URL = os.getenv("BRIGHTDATA_MCP_URL")
+
 if not BRIGHTDATA_MCP_URL:
     raise RuntimeError("BRIGHTDATA_MCP_URL environment variable is missing!")
 
+
+# Create MCP server
 server = FastMCP(
     name="BrightData Universal MCP Proxy"
 )
 
-# -----------------------
-# Utility: call Bright Data MCP via SSE
-# -----------------------
-async def call_brightdata(tool: str, arguments: dict):
-    """
-    Call BrightData MCP server via SSE endpoint
-    """
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        response = await client.post(
-            f"{BRIGHTDATA_MCP_URL}/call-tool",
-            json={
-                "tool": tool,
-                "arguments": arguments
-            }
-        )
-        response.raise_for_status()
-        return response.json()
-
-# -----------------------
-# Tools exposed to ChatGPT
-# -----------------------
+# ---- Simple ping ----
 @server.tool()
 def ping() -> str:
-    """Simple ping to test server connectivity"""
     return "pong"
 
-@server.tool()
-async def search_engine(query: str) -> dict:
-    """
-    Search the web using BrightData's search engine.
-    
-    Args:
-        query: The search query string
-    """
-    return await call_brightdata("search_engine", {"query": query})
 
+# ---- Bright Data: search_engine ----
 @server.tool()
-async def scrape_as_markdown(url: str) -> dict:
-    """
-    Scrape a webpage and return its content as markdown.
-    
-    Args:
-        url: The URL to scrape
-    """
-    return await call_brightdata("scrape_as_markdown", {"url": url})
+def search_engine(query: str) -> str:
+    payload = {
+        "type": "message",
+        "body": {
+            "type": "callTool",
+            "name": "search_engine",
+            "arguments": {"query": query}
+        }
+    }
+    r = requests.post(BRIGHTDATA_MCP_URL, json=payload)
+    return r.text
 
+
+# ---- Bright Data: scrape_as_markdown ----
 @server.tool()
-async def search_engine_batch(queries: list[str]) -> dict:
-    """
-    Perform multiple searches in batch.
-    
-    Args:
-        queries: List of search query strings
-    """
-    return await call_brightdata("search_engine_batch", {"queries": queries})
+def scrape_as_markdown(url: str) -> str:
+    payload = {
+        "type": "message",
+        "body": {
+            "type": "callTool",
+            "name": "scrape_as_markdown",
+            "arguments": {"url": url}
+        }
+    }
+    r = requests.post(BRIGHTDATA_MCP_URL, json=payload)
+    return r.text
 
+
+# ---- Bright Data: search_engine_batch ----
 @server.tool()
-async def scrape_batch(urls: list[str]) -> dict:
-    """
-    Scrape multiple URLs in batch.
-    
-    Args:
-        urls: List of URLs to scrape
-    """
-    return await call_brightdata("scrape_batch", {"urls": urls})
+def search_engine_batch(queries: list[str]) -> str:
+    payload = {
+        "type": "message",
+        "body": {
+            "type": "callTool",
+            "name": "search_engine_batch",
+            "arguments": {"queries": queries}
+        }
+    }
+    r = requests.post(BRIGHTDATA_MCP_URL, json=payload)
+    return r.text
 
-# -----------------------
-# Run the MCP server
-# -----------------------
+
+# ---- Bright Data: scrape_batch ----
+@server.tool()
+def scrape_batch(urls: list[str]) -> str:
+    payload = {
+        "type": "message",
+        "body": {
+            "type": "callTool",
+            "name": "scrape_batch",
+            "arguments": {"urls": urls}
+        }
+    }
+    r = requests.post(BRIGHTDATA_MCP_URL, json=payload)
+    return r.text
+
+
+# ---- Run server (same as yesterday) ----
 if __name__ == "__main__":
     server.run(
         transport="sse",
