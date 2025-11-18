@@ -1,72 +1,83 @@
 import os
 import requests
 from fastmcp import FastMCP
-from fastapi import FastAPI
 
+# Load secret Bright Data MCP URL
+# IMPORTANT: Ensure this environment variable is set on Render!
 BRIGHTDATA_MCP_URL = os.getenv("BRIGHTDATA_MCP_URL")
 if not BRIGHTDATA_MCP_URL:
     raise RuntimeError("BRIGHTDATA_MCP_URL environment variable is missing!")
 
+
 server = FastMCP(name="BrightData Universal MCP Proxy")
-app: FastAPI = server.app
-
-
-@app.get("/healthz")
-async def health_check():
-    return {"ok": True}
-
-
-def forward_to_brightdata(tool_name: str, arguments: dict):
-    payload = {
-        "type": "message",
-        "body": {
-            "type": "callTool",
-            "name": tool_name,
-            "arguments": arguments,
-        },
-    }
-
-    try:
-        r = requests.post(
-            BRIGHTDATA_MCP_URL,
-            json=payload,
-            timeout=30
-        )
-        r.raise_for_status()
-        return r.text
-    except Exception as e:
-        return f"Bright Data MCP error: {e}"
 
 
 @server.tool()
 def ping() -> str:
+    """A basic tool to check if the server is running."""
     return "pong"
 
 
 @server.tool()
 def search_engine(query: str) -> str:
-    return forward_to_brightdata("search_engine", {"query": query})
+    """Performs a search engine query via Bright Data MCP."""
+    payload = {
+        "type": "message",
+        "body": {
+            "type": "callTool",
+            "name": "search_engine",
+            "arguments": {"query": query}
+        }
+    }
+    return requests.post(BRIGHTDATA_MCP_URL, json=payload).text
 
 
 @server.tool()
 def scrape_as_markdown(url: str) -> str:
-    return forward_to_brightdata("scrape_as_markdown", {"url": url})
+    """Scrapes a given URL and returns the content in Markdown format."""
+    payload = {
+        "type": "message",
+        "body": {
+            "type": "callTool",
+            "name": "scrape_as_markdown",
+            "arguments": {"url": url}
+        }
+    }
+    return requests.post(BRIGHTDATA_MCP_URL, json=payload).text
 
 
 @server.tool()
 def search_engine_batch(queries: list[str]) -> str:
-    return forward_to_brightdata("search_engine_batch", {"queries": queries})
+    """Performs multiple search engine queries in a batch via Bright Data MCP."""
+    payload = {
+        "type": "message",
+        "body": {
+            "type": "callTool",
+            "name": "search_engine_batch",
+            "arguments": {"queries": queries}
+        }
+    }
+    return requests.post(BRIGHTDATA_MCP_URL, json=payload).text
 
 
 @server.tool()
 def scrape_batch(urls: list[str]) -> str:
-    return forward_to_brightdata("scrape_batch", {"urls": urls})
+    """Scrapes multiple URLs in a batch via Bright Data MCP."""
+    payload = {
+        "type": "message",
+        "body": {
+            "type": "callTool",
+            "name": "scrape_batch",
+            "arguments": {"urls": urls}
+        }
+    }
+    return requests.post(BRIGHTDATA_MCP_URL, json=payload).text
 
 
 if __name__ == "__main__":
     server.run(
-        transport="sse",
+        # Removed 'transport="sse"'. FastMCP will now default to the
+        # correct HTTP/WebSocket transport needed for the ChatGPT connector.
         host="0.0.0.0",
-        port=8000,
-        base_path="/mcp"  # <--- THIS is the correct parameter
+        port=8000
     )
