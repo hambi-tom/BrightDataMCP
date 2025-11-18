@@ -1,7 +1,7 @@
 import os
 import requests
 from fastmcp import FastMCP
-from starlette.responses import Response # <-- NEW REQUIRED IMPORT
+from starlette.responses import Response
 
 # Load secret Bright Data MCP URL
 BRIGHTDATA_MCP_URL = os.getenv("BRIGHTDATA_MCP_URL")
@@ -11,19 +11,8 @@ if not BRIGHTDATA_MCP_URL:
 
 server = FastMCP(name="BrightData Universal MCP Proxy")
 
-
-# =========================================================================
-# CRITICAL FIX: Add a POST route to /sse to handle the connector handshake.
-# This bypasses the 405 Method Not Allowed error.
-# =========================================================================
-@server.app.post("/sse")
-async def sse_post_handler():
-    """Forces acceptance of the POST request required by the connector setup process."""
-    # We simply return a 200 OK status to let the connector proceed with registration.
-    return Response(status_code=200)
-
-# =========================================================================
-
+# The previous code to fix POST /sse is being removed because 'server.app' does not exist
+# on your version of FastMCP, causing the deployment to fail.
 
 @server.tool()
 def ping() -> str:
