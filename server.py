@@ -1,96 +1,84 @@
 import os
-import requests
-import asyncio
-from fastapi import FastAPI, Request, Response
-from fastapi.responses import JSONResponse
 from fastmcp import FastMCP
-import uvicorn
+from mcp import ClientSession
+from mcp.client.sse import sse_client
 
+# Get the BrightData MCP SSE URL from environment
 BRIGHTDATA_MCP_URL = os.getenv("BRIGHTDATA_MCP_URL")
 if not BRIGHTDATA_MCP_URL:
-    raise RuntimeError("Missing BRIGHTDATA_MCP_URL env variable")
+    raise RuntimeError("BRIGHTDATA_MCP_URL environment variable is missing!")
 
-# ------------------------------
-# FastMCP server
-# ------------------------------
-mcp = FastMCP(name="BrightData Universal MCP Proxy")
+server = FastMCP(
+    name="BrightData Universal MCP Proxy"
+)
 
-@mcp.tool()
+# -----------------------
+# Utility: Connect to BrightData MCP via SSE
+# -----------------------
+async def call_brightdata(tool: str, arguments: dict):
+    """
+    Call BrightData MCP server via their hosted SSE endpoint
+    """
+    async with sse_client(BRIGHTDATA_MCP_URL) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.call_tool(tool, arguments)
+            return result.content
+
+# -----------------------
+# Tools exposed to ChatGPT
+# -----------------------
+@server.tool()
 def ping() -> str:
+    """Simple ping to test server connectivity"""
     return "pong"
 
+@server.tool()
+async def search_engine(query: str) -> list:
+    """
+    Search the web using BrightData's search engine.
+    
+    Args:
+        query: The search query string
+    """
+    return await call_brightdata("search_engine", {"query": query})
 
-def call_bd(tool, args):
-    payload = {
-        "type": "message",
-        "body": {
-            "type": "callTool",
-            "name": tool,
-            "arguments": args
-        }
-    }
-    r = requests.post(BRIGHTDATA_MCP_URL, json=payload)
-    return r.text
+@server.tool()
+async def scrape_as_markdown(url: str) -> list:
+    """
+    Scrape a webpage and return its content as markdown.
+    
+    Args:
+        url: The URL to scrape
+    """
+    return await call_brightdata("scrape_as_markdown", {"url": url})
 
+@server.tool()
+async def search_engine_batch(queries: list[str]) -> list:
+    """
+    Perform multiple searches in batch.
+    
+    Args:
+        queries: List of search query strings
+    """
+    return await call_brightdata("search_engine_batch", {"queries": queries})
 
-@mcp.tool()
-def search_engine(query: str):
-    return call_bd("search_engine", {"query": query})
+@server.tool()
+async def scrape_batch(urls: list[str]) -> list:
+    """
+    Scrape multiple URLs in batch.
+    
+    Args:
+        urls: List of URLs to scrape
+    """
+    return await call_brightdata("scrape_batch", {"urls": urls})
 
-@mcp.tool()
-def scrape_as_markdown(url: str):
-    return call_bd("scrape_as_markdown", {"url": url})
-
-@mcp.tool()
-def search_engine_batch(queries: list[str]):
-    return call_bd("search_engine_batch", {"queries": queries})
-
-@mcp.tool()
-def scrape_batch(urls: list[str]):
-    return call_bd("scrape_batch", {"urls": urls})
-
-
-# ------------------------------
-# FastAPI wrapper — makes it SAFE
-# ------------------------------
-app = FastAPI()
-
-@app.get("/")
-def root():
-    return {"ok": True, "server": "BrightData MCP Proxy"}
-
-@app.get("/healthz")
-def health():
-    return {"ok": True}
-
-
-# ------------------------------
-# Proxy /sse → FastMCP SSE server
-# ------------------------------
-@app.get("/sse")
-async def sse(request: Request):
-    # Forward to FastMCP internal SSE generator
-    generator = mcp.sse_handler()
-
-    async def event_stream():
-        async for event in generator:
-            yield f"data: {event}\n\n"
-
-    return Response(event_stream(), media_type="text/event-stream")
-
-
-# ------------------------------
-# Proxy /messages → FastMCP
-# ------------------------------
-@app.post("/messages/")
-async def messages(request: Request):
-    body = await request.json()
-    response = await mcp.process_message(body)
-    return JSONResponse(response)
-
-
-# ------------------------------
-# Run server
-# ------------------------------
+# -----------------------
+# Run the MCP server
+# -----------------------
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    server.run(
+        transport="sse",
+        host="0.0.0.0",
+        port=8000
+    )
