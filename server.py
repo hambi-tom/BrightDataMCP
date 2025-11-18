@@ -14,15 +14,29 @@ server = FastMCP(
     name="BrightData Universal MCP Proxy"
 )
 
+
 # ---- Simple ping ----
 @server.tool()
 def ping() -> str:
     return "pong"
 
 
+# ---- Helper: wrap responses in valid MCP format ----
+def wrap(result_text: str):
+    return {
+        "type": "result",
+        "content": [
+            {
+                "type": "text",
+                "text": result_text
+            }
+        ]
+    }
+
+
 # ---- Bright Data: search_engine ----
 @server.tool()
-def search_engine(query: str) -> str:
+def search_engine(query: str):
     payload = {
         "type": "message",
         "body": {
@@ -32,12 +46,12 @@ def search_engine(query: str) -> str:
         }
     }
     r = requests.post(BRIGHTDATA_MCP_URL, json=payload)
-    return r.text
+    return wrap(r.text)
 
 
 # ---- Bright Data: scrape_as_markdown ----
 @server.tool()
-def scrape_as_markdown(url: str) -> str:
+def scrape_as_markdown(url: str):
     payload = {
         "type": "message",
         "body": {
@@ -47,12 +61,12 @@ def scrape_as_markdown(url: str) -> str:
         }
     }
     r = requests.post(BRIGHTDATA_MCP_URL, json=payload)
-    return r.text
+    return wrap(r.text)
 
 
 # ---- Bright Data: search_engine_batch ----
 @server.tool()
-def search_engine_batch(queries: list[str]) -> str:
+def search_engine_batch(queries: list[str]):
     payload = {
         "type": "message",
         "body": {
@@ -62,12 +76,12 @@ def search_engine_batch(queries: list[str]) -> str:
         }
     }
     r = requests.post(BRIGHTDATA_MCP_URL, json=payload)
-    return r.text
+    return wrap(r.text)
 
 
 # ---- Bright Data: scrape_batch ----
 @server.tool()
-def scrape_batch(urls: list[str]) -> str:
+def scrape_batch(urls: list[str]):
     payload = {
         "type": "message",
         "body": {
@@ -77,7 +91,7 @@ def scrape_batch(urls: list[str]) -> str:
         }
     }
     r = requests.post(BRIGHTDATA_MCP_URL, json=payload)
-    return r.text
+    return wrap(r.text)
 
 
 # ---- Run server (same as yesterday) ----
