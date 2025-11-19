@@ -4,34 +4,36 @@ from fastmcp import FastMCP
 from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi import Request
 
-# ---------------------------------------------------------
-# Load BrightData MCP Server URL (must include token)
-# ---------------------------------------------------------
-BRIGHTDATA_MCP_URL = os.getenv("BRIGHTDATA_MCP_URL")
+# ----------------------------------------------------------
+# Environment Variables
+# ----------------------------------------------------------
+BRIGHTDATA_MCP_POST = os.getenv("BRIGHTDATA_MCP_POST")
+BRIGHTDATA_MCP_SSE = os.getenv("BRIGHTDATA_MCP_SSE")
+BRIGHTDATA_MCP_TOKEN = os.getenv("BRIGHTDATA_MCP_TOKEN")
 
-if not BRIGHTDATA_MCP_URL:
-    raise RuntimeError("BRIGHTDATA_MCP_URL environment variable is missing!")
+if not BRIGHTDATA_MCP_POST or not BRIGHTDATA_MCP_SSE or not BRIGHTDATA_MCP_TOKEN:
+    raise RuntimeError("Missing BrightData MCP environment variables")
 
-# ---------------------------------------------------------
+HEADERS = {
+    "Authorization": f"Bearer {BRIGHTDATA_MCP_TOKEN}"
+}
+
+# ----------------------------------------------------------
 # Create MCP Server
-# ---------------------------------------------------------
+# ----------------------------------------------------------
 server = FastMCP(
     name="BrightData Universal MCP Proxy"
 )
 
-app = server.app   # FastAPI instance underlying FastMCP
+app = server.app  # FastAPI instance inside FastMCP
 
 
-# ---------------------------------------------------------
-# Required MCP Metadata Endpoint (root)
-# ChatGPT calls GET / to validate the connector’s safety.
-# ---------------------------------------------------------
+# ----------------------------------------------------------
+# REQUIRED: GET /
+# ChatGPT calls this to verify the connector is safe.
+# ----------------------------------------------------------
 @app.get("/")
 async def root():
-    """
-    ChatGPT calls this during connector validation.
-    MUST return 200 and MCP metadata.
-    """
     metadata = {
         "name": server.name,
         "version": "1.0.0",
@@ -39,7 +41,7 @@ async def root():
         "tools": []
     }
 
-    # Populate with your tool definitions
+    # Auto-include tool metadata
     for tool in server.tools:
         metadata["tools"].append({
             "name": tool.name,
@@ -50,36 +52,27 @@ async def root():
     return JSONResponse(metadata)
 
 
-# ---------------------------------------------------------
-# REQUIRED: POST /sse for ChatGPT MCP handshake
-#
-# ChatGPT validation sends:
-#   POST /sse     (validation)
-#   GET  /sse     (actual SSE stream)
-#
-# FastMCP only implements GET /sse internally,
-# so we must add this POST handler manually.
-# ---------------------------------------------------------
+# ----------------------------------------------------------
+# REQUIRED: POST /sse
+# ChatGPT does a validation POST before opening GET /sse.
+# ----------------------------------------------------------
 @app.post("/sse")
 async def post_sse(_: Request):
     return PlainTextResponse("OK", status_code=200)
 
 
-# ---------------------------------------------------------
+# ----------------------------------------------------------
 # Simple ping tool
-# ---------------------------------------------------------
+# ----------------------------------------------------------
 @server.tool()
 def ping() -> str:
     return "pong"
 
 
-# ---------------------------------------------------------
-# BrightData Tool Proxies
-# ---------------------------------------------------------
+# ----------------------------------------------------------
+# BrightData MCP Proxy Helper
+# ----------------------------------------------------------
 def call_brightdata_tool(tool_name: str, args: dict):
-    """
-    Common wrapper for calling BrightData MCP endpoint.
-    """
     payload = {
         "type": "message",
         "body": {
@@ -89,11 +82,18 @@ def call_brightdata_tool(tool_name: str, args: dict):
         }
     }
 
-    r = requests.post(BRIGHTDATA_MCP_URL, json=payload)
+    r = requests.post(
+        BRIGHTDATA_MCP_POST,
+        json=payload,
+        headers=HEADERS
+    )
     r.raise_for_status()
     return r.text
 
 
+# ----------------------------------------------------------
+# BrightData Tools (proxied)
+# ----------------------------------------------------------
 @server.tool()
 def search_engine(query: str) -> str:
     return call_brightdata_tool("search_engine", {"query": query})
@@ -114,9 +114,9 @@ def scrape_batch(urls: list[str]) -> str:
     return call_brightdata_tool("scrape_batch", {"urls": urls})
 
 
-# ---------------------------------------------------------
-# Run Server (SSE transport required)
-# ---------------------------------------------------------
+# ----------------------------------------------------------
+# RUN SERVER (SSE transport required)
+# ----------------------------------------------------------
 if __name__ == "__main__":
     server.run(
         transport="sse",
