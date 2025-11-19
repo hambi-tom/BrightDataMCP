@@ -3,4 +3,3 @@ uvicorn
 fastmcp
 httpx
 sse-starlette
-python-dotenv
