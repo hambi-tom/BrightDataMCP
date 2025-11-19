@@ -1,9 +1,9 @@
 import os
-import json
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from sse_starlette.sse import EventSourceResponse
-from fastmcp import FastMCP, tool
+from fastmcp import FastMCP
 
 BRIGHT_DATA_API_KEY = os.environ.get("BRIGHT_DATA_API_KEY")
 
@@ -11,11 +11,9 @@ app = FastAPI()
 mcp = FastMCP(name="brightdata-mcp")
 
 
-@tool()
+@mcp.tool()
 async def fetch_url(url: str) -> str:
     """Fetch a URL using BrightData Web Unlocker."""
-    import httpx
-
     if not BRIGHT_DATA_API_KEY:
         return "Missing BRIGHT_DATA_API_KEY environment variable."
 
@@ -42,7 +40,6 @@ async def health():
     return PlainTextResponse("OK", status_code=200)
 
 
-# REQUIRED BY CHATGPT MCP — BOTH GET + POST MUST RETURN SSE STREAM
 @app.get("/sse")
 async def sse_get(request: Request):
     async def event_publisher():
