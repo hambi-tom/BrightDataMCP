@@ -1,6 +1,8 @@
 import os
 import requests
+
 from fastmcp import FastMCP
+from fastmcp import expose_fastapi_app  # NEW for FastMCP 2.x
 from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi import Request
 
@@ -21,16 +23,16 @@ HEADERS = {
 # ----------------------------------------------------------
 # Create MCP Server
 # ----------------------------------------------------------
-server = FastMCP(
-    name="BrightData Universal MCP Proxy"
-)
+server = FastMCP(name="BrightData Universal MCP Proxy")
 
-app = server.app  # FastAPI instance inside FastMCP
+# ----------------------------------------------------------
+# Bind FastAPI to FastMCP (FIX FOR v2.13+)
+# ----------------------------------------------------------
+app = expose_fastapi_app(server)
 
 
 # ----------------------------------------------------------
 # REQUIRED: GET /
-# ChatGPT calls this to verify the connector is safe.
 # ----------------------------------------------------------
 @app.get("/")
 async def root():
@@ -41,7 +43,6 @@ async def root():
         "tools": []
     }
 
-    # Auto-include tool metadata
     for tool in server.tools:
         metadata["tools"].append({
             "name": tool.name,
@@ -54,7 +55,6 @@ async def root():
 
 # ----------------------------------------------------------
 # REQUIRED: POST /sse
-# ChatGPT does a validation POST before opening GET /sse.
 # ----------------------------------------------------------
 @app.post("/sse")
 async def post_sse(_: Request):
@@ -70,7 +70,7 @@ def ping() -> str:
 
 
 # ----------------------------------------------------------
-# BrightData MCP Proxy Helper
+# BrightData Proxy
 # ----------------------------------------------------------
 def call_brightdata_tool(tool_name: str, args: dict):
     payload = {
@@ -91,9 +91,6 @@ def call_brightdata_tool(tool_name: str, args: dict):
     return r.text
 
 
-# ----------------------------------------------------------
-# BrightData Tools (proxied)
-# ----------------------------------------------------------
 @server.tool()
 def search_engine(query: str) -> str:
     return call_brightdata_tool("search_engine", {"query": query})
@@ -115,7 +112,7 @@ def scrape_batch(urls: list[str]) -> str:
 
 
 # ----------------------------------------------------------
-# RUN SERVER (SSE transport required)
+# Run Server (SSE transport)
 # ----------------------------------------------------------
 if __name__ == "__main__":
     server.run(
