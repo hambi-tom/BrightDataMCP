@@ -1,10 +1,9 @@
 import os
 import requests
-
 from fastmcp import FastMCP
-from fastmcp import expose_fastapi_app  # NEW for FastMCP 2.x
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
-from fastapi import Request
+import uvicorn
 
 # ----------------------------------------------------------
 # Environment Variables
@@ -21,15 +20,14 @@ HEADERS = {
 }
 
 # ----------------------------------------------------------
-# Create MCP Server
+# Create MCP Server (tools only)
 # ----------------------------------------------------------
-server = FastMCP(name="BrightData Universal MCP Proxy")
+mcp_server = FastMCP(name="BrightData Universal MCP Proxy")
 
 # ----------------------------------------------------------
-# Bind FastAPI to FastMCP (FIX FOR v2.13+)
+# Create separate FastAPI app
 # ----------------------------------------------------------
-app = expose_fastapi_app(server)
-
+app = FastAPI()
 
 # ----------------------------------------------------------
 # REQUIRED: GET /
@@ -37,13 +35,13 @@ app = expose_fastapi_app(server)
 @app.get("/")
 async def root():
     metadata = {
-        "name": server.name,
+        "name": mcp_server.name,
         "version": "1.0.0",
         "protocol": "2024-11-06",
         "tools": []
     }
 
-    for tool in server.tools:
+    for tool in mcp_server.tools:
         metadata["tools"].append({
             "name": tool.name,
             "description": tool.description or "",
@@ -52,7 +50,6 @@ async def root():
 
     return JSONResponse(metadata)
 
-
 # ----------------------------------------------------------
 # REQUIRED: POST /sse
 # ----------------------------------------------------------
@@ -60,18 +57,28 @@ async def root():
 async def post_sse(_: Request):
     return PlainTextResponse("OK", status_code=200)
 
+# ----------------------------------------------------------
+# Bind MCP SSE route manually
+# ----------------------------------------------------------
+@app.get("/sse")
+async def sse(request: Request):
+    return await mcp_server.handle_sse(request)
 
 # ----------------------------------------------------------
-# Simple ping tool
+# Bind MCP messages endpoint
 # ----------------------------------------------------------
-@server.tool()
+@app.post("/messages/")
+async def messages(session_id: str, request: Request):
+    body = await request.json()
+    return await mcp_server.handle_message(session_id, body)
+
+# ----------------------------------------------------------
+# Tools (proxied)
+# ----------------------------------------------------------
+@mcp_server.tool()
 def ping() -> str:
     return "pong"
 
-
-# ----------------------------------------------------------
-# BrightData Proxy
-# ----------------------------------------------------------
 def call_brightdata_tool(tool_name: str, args: dict):
     payload = {
         "type": "message",
@@ -90,33 +97,24 @@ def call_brightdata_tool(tool_name: str, args: dict):
     r.raise_for_status()
     return r.text
 
-
-@server.tool()
+@mcp_server.tool()
 def search_engine(query: str) -> str:
     return call_brightdata_tool("search_engine", {"query": query})
 
-
-@server.tool()
+@mcp_server.tool()
 def scrape_as_markdown(url: str) -> str:
     return call_brightdata_tool("scrape_as_markdown", {"url": url})
 
-
-@server.tool()
+@mcp_server.tool()
 def search_engine_batch(queries: list[str]) -> str:
     return call_brightdata_tool("search_engine_batch", {"queries": queries})
 
-
-@server.tool()
+@mcp_server.tool()
 def scrape_batch(urls: list[str]) -> str:
     return call_brightdata_tool("scrape_batch", {"urls": urls})
 
-
 # ----------------------------------------------------------
-# Run Server (SSE transport)
+# Uvicorn Server
 # ----------------------------------------------------------
 if __name__ == "__main__":
-    server.run(
-        transport="sse",
-        host="0.0.0.0",
-        port=8000
-    )
+    uvicorn.run(app, host="0.0.0.0", port=8000)
