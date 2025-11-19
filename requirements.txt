@@ -2,5 +2,5 @@ fastapi
 uvicorn
 fastmcp
 httpx
-python-dotenv
 sse-starlette
+python-dotenv
