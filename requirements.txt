@@ -1,4 +1,6 @@
-fastmcp
 fastapi
 uvicorn
-requests
+fastmcp
+httpx
+python-dotenv
+sse-starlette
