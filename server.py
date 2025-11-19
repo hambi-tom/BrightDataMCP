@@ -42,14 +42,11 @@ async def root():
         "name": mcp.name,
         "version": "1.0.0",
         "protocol": "2024-11-06",
-        "tools": [
-            {"name": t.name, "description": t.description or ""}
-            for t in mcp.tools
-        ]
+        "status": "running"
     })
 
 # ============================================================
-# REQUIRED: POST /sse  → MUST RETURN 200 (CHATGPT CHECK)
+# REQUIRED: POST /sse  → MUST RETURN 200
 # ============================================================
 @app.post("/sse")
 async def post_sse(_: Request):
